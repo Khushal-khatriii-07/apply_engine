@@ -84,20 +84,57 @@ class _LeadsTabState extends State<LeadsTab> {
                   ],
                 );
               }),
-              // Deduplication badges
-              Obx(() {
-                if (controller.leads.isEmpty) return const SizedBox.shrink();
-                return Row(
-                  children: [
-                    if (controller.removeDuplicates.value)
-                      _buildMiniBadge("DUP-EMAIL", Colors.orange, isDark),
-                    if (controller.detectDuplicateRecruiter.value) ...[
-                      const SizedBox(width: 6),
-                      _buildMiniBadge("DUP-REC", Colors.teal, isDark),
-                    ],
-                  ],
-                );
-              }),
+              // Deduplication badges & AI Hunter Action
+              Row(
+                children: [
+                  Obx(() {
+                    if (controller.leads.isEmpty) return const SizedBox.shrink();
+                    return Row(
+                      children: [
+                        if (controller.removeDuplicates.value)
+                          _buildMiniBadge("DUP-EMAIL", Colors.orange, isDark),
+                        if (controller.detectDuplicateRecruiter.value) ...[
+                          const SizedBox(width: 6),
+                          _buildMiniBadge("DUP-REC", Colors.teal, isDark),
+                        ],
+                        const SizedBox(width: 8),
+                      ],
+                    );
+                  }),
+                  // AI Job Hunter Trigger Button
+                  InkWell(
+                    onTap: () => _showJobHunterModal(context, isDark),
+                    borderRadius: BorderRadius.circular(10),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF8B5CF6), Color(0xFF6366F1)],
+                        ),
+                        borderRadius: BorderRadius.circular(10),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFF8B5CF6).withOpacity(0.3),
+                            blurRadius: 6,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: const [
+                          Icon(Icons.bolt_rounded, size: 14, color: Colors.white),
+                          SizedBox(width: 4),
+                          Text(
+                            "AI Job Hunter",
+                            style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ],
           ),
         ),
@@ -264,7 +301,107 @@ class _LeadsTabState extends State<LeadsTab> {
             ),
           ),
         ),
-        const SizedBox(height: 8),
+
+        // AI Match Filtering & Scoring Action Banner
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 4.0),
+          child: Obx(() {
+            final isRunning = controller.isMatchingRunning.value;
+            final filterActive = controller.filterByMatchScore.value;
+            final minScore = controller.minMatchScore.value;
+
+            return Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: isDark
+                      ? [const Color(0xFF1E1B4B), const Color(0xFF0F172A)]
+                      : [const Color(0xFFEEF2FF), const Color(0xFFF8FAFC)],
+                  begin: Alignment.centerLeft,
+                  end: Alignment.centerRight,
+                ),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: isDark ? const Color(0xFF4338CA).withOpacity(0.3) : const Color(0xFFC7D2FE),
+                  width: 1.2,
+                ),
+              ),
+              child: Column(
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.auto_awesome_rounded, size: 16, color: Color(0xFF8B5CF6)),
+                          const SizedBox(width: 8),
+                          Text(
+                            "Filter Match >= $minScore%",
+                            style: GoogleFonts.outfit(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: isDark ? Colors.white : const Color(0xFF312E81),
+                            ),
+                          ),
+                        ],
+                      ),
+                      Row(
+                        children: [
+                          if (!isRunning)
+                            InkWell(
+                              onTap: () => controller.scoreAllLeadsWithGemini(),
+                              borderRadius: BorderRadius.circular(10),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF8B5CF6),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Row(
+                                  children: const [
+                                    Icon(Icons.play_arrow_rounded, color: Colors.white, size: 14),
+                                    SizedBox(width: 4),
+                                    Text(
+                                      "Score with AI",
+                                      style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          const SizedBox(width: 8),
+                          Transform.scale(
+                            scale: 0.8,
+                            child: Switch(
+                              value: filterActive,
+                              activeColor: const Color(0xFF8B5CF6),
+                              onChanged: (val) {
+                                controller.filterByMatchScore.value = val;
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                  if (isRunning) ...[
+                    const SizedBox(height: 8),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(4),
+                      child: LinearProgressIndicator(
+                        value: controller.matchingProgress.value,
+                        backgroundColor: Colors.grey.withOpacity(0.2),
+                        color: const Color(0xFF8B5CF6),
+                        minHeight: 4,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            );
+          }),
+        ),
+        const SizedBox(height: 6),
 
         // ListView Contact Grid Cards (Premium Mockup)
         Expanded(
@@ -370,6 +507,70 @@ class _LeadsTabState extends State<LeadsTab> {
                                 ],
                               ),
                             ),
+                            // AI Match Badge or Quick Score Trigger
+                            if (lead.matchScore > 0) ...[
+                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: lead.matchScore >= 75
+                                      ? const Color(0xFF10B981).withOpacity(0.15)
+                                      : (lead.matchScore >= 50
+                                          ? Colors.amber.withOpacity(0.15)
+                                          : Colors.grey.withOpacity(0.15)),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: lead.matchScore >= 75
+                                        ? const Color(0xFF10B981)
+                                        : (lead.matchScore >= 50 ? Colors.amber : Colors.grey),
+                                    width: 1.0,
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.auto_awesome_rounded,
+                                      size: 10,
+                                      color: lead.matchScore >= 75 ? const Color(0xFF10B981) : Colors.grey,
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      "${lead.matchScore}% Match",
+                                      style: TextStyle(
+                                        color: lead.matchScore >= 75
+                                            ? const Color(0xFF10B981)
+                                            : (lead.matchScore >= 50 ? Colors.amber[800] : Colors.grey),
+                                        fontSize: 9,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ] else ...[
+                              const SizedBox(width: 6),
+                              InkWell(
+                                onTap: () => controller.scoreSingleLead(lead),
+                                borderRadius: BorderRadius.circular(12),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF8B5CF6).withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(color: const Color(0xFF8B5CF6).withOpacity(0.3)),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: const [
+                                      Icon(Icons.auto_awesome_rounded, size: 9, color: Color(0xFF8B5CF6)),
+                                      SizedBox(width: 3),
+                                      Text("AI Score", style: TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: Color(0xFF8B5CF6))),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
                           ],
                         ),
                         const Divider(height: 20),
@@ -402,6 +603,75 @@ class _LeadsTabState extends State<LeadsTab> {
                           ],
                         ),
 
+                        // AI Match Highlights & Custom Cold Pitch Box (if available)
+                        if (lead.matchReasons.isNotEmpty || lead.customPitch.isNotEmpty) ...[
+                          const SizedBox(height: 12),
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                              ),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                if (lead.matchReasons.isNotEmpty) ...[
+                                  Row(
+                                    children: [
+                                      const Icon(Icons.check_circle_rounded, size: 12, color: Color(0xFF10B981)),
+                                      const SizedBox(width: 6),
+                                      Expanded(
+                                        child: Text(
+                                          lead.matchReasons.first,
+                                          style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                                if (lead.missingSkills.isNotEmpty) ...[
+                                  const SizedBox(height: 4),
+                                  Wrap(
+                                    spacing: 4,
+                                    children: lead.missingSkills.map((skill) => Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                                      decoration: BoxDecoration(
+                                        color: Colors.redAccent.withOpacity(0.1),
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
+                                      child: Text(
+                                        "Gap: $skill",
+                                        style: const TextStyle(fontSize: 8, color: Colors.redAccent),
+                                      ),
+                                    )).toList(),
+                                  ),
+                                ],
+                                if (lead.customPitch.isNotEmpty) ...[
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    "Tailored AI Cold Pitch:",
+                                    style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.grey[500]),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    lead.customPitch,
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontStyle: FontStyle.italic,
+                                      color: isDark ? Colors.white70 : Colors.black87,
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                        ],
+
                         // Bottom Actions Row (Mini visual outlines triggers)
                         const SizedBox(height: 12),
                         Row(
@@ -416,6 +686,30 @@ class _LeadsTabState extends State<LeadsTab> {
                                   Get.snackbar("Copied", "Email copied to clipboard.");
                                 },
                               ),
+                            if (lead.customPitch.isNotEmpty) ...[
+                              const SizedBox(width: 8),
+                              _buildMiniIconButton(
+                                icon: Icons.auto_awesome_rounded,
+                                tooltip: "Copy AI Cold Pitch",
+                                onTap: () {
+                                  Clipboard.setData(ClipboardData(text: lead.customPitch));
+                                  Get.snackbar("Pitch Copied", "Tailored cold pitch copied to clipboard.");
+                                },
+                              ),
+                            ],
+                            if (lead.applyUrl.isNotEmpty) ...[
+                              const SizedBox(width: 8),
+                              _buildMiniIconButton(
+                                icon: Icons.open_in_new_rounded,
+                                tooltip: "1-Click Direct Apply",
+                                onTap: () async {
+                                  final uri = Uri.parse(lead.applyUrl);
+                                  if (await canLaunchUrl(uri)) {
+                                    await launchUrl(uri, mode: LaunchMode.externalApplication);
+                                  }
+                                },
+                              ),
+                            ],
                             if (lead.mobile.isNotEmpty) ...[
                               const SizedBox(width: 8),
                               _buildMiniIconButton(
@@ -549,7 +843,7 @@ class _LeadsTabState extends State<LeadsTab> {
                   () => DropdownButton<String>(
                     value: controller.sortColumn.value,
                     isExpanded: true,
-                    items: ['Company', 'Recruiter', 'Status'].map(
+                    items: ['Company', 'Recruiter', 'Status', 'Match Score'].map(
                       (c) => DropdownMenuItem<String>(
                         value: c,
                         child: Text(c, style: const TextStyle(fontSize: 12)),
@@ -580,6 +874,277 @@ class _LeadsTabState extends State<LeadsTab> {
       textConfirm: "Apply",
       confirmTextColor: Colors.white,
       onConfirm: () => Get.back(),
+    );
+  }
+
+  void _showJobHunterModal(BuildContext context, bool isDark) {
+    final rawTextController = TextEditingController();
+    int activeTab = 0; // 0 = Live Hunt, 1 = Raw Feed Paste
+
+    Get.bottomSheet(
+      StatefulBuilder(
+        builder: (context, setModalState) {
+          return Container(
+            height: context.height * 0.85,
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF0F172A) : Colors.white,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+              border: Border.all(
+                color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                width: 1.5,
+              ),
+            ),
+            child: ListView(
+              children: [
+                // Modal Handle Bar
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.grey.withOpacity(0.4),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Header
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(colors: [Color(0xFF8B5CF6), Color(0xFF6366F1)]),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(Icons.bolt_rounded, color: Colors.white, size: 20),
+                        ),
+                        const SizedBox(width: 12),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              "Autonomous Job Hunter",
+                              style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 16),
+                            ),
+                            const Text(
+                              "Find live hiring posts without manual Excel sheets",
+                              style: TextStyle(fontSize: 10, color: Colors.grey),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close_rounded),
+                      onPressed: () => Get.back(),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+
+                // Mode Tabs
+                Container(
+                  padding: const EdgeInsets.all(3),
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () => setModalState(() => activeTab = 0),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            decoration: BoxDecoration(
+                              color: activeTab == 0 ? (isDark ? const Color(0xFF6366F1) : Colors.white) : Colors.transparent,
+                              borderRadius: BorderRadius.circular(12),
+                              boxShadow: activeTab == 0 && !isDark
+                                  ? [BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 4)]
+                                  : null,
+                            ),
+                            alignment: Alignment.center,
+                            child: const Text("⚡ Live AI Hunt", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () => setModalState(() => activeTab = 1),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            decoration: BoxDecoration(
+                              color: activeTab == 1 ? (isDark ? const Color(0xFF6366F1) : Colors.white) : Colors.transparent,
+                              borderRadius: BorderRadius.circular(12),
+                              boxShadow: activeTab == 1 && !isDark
+                                  ? [BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 4)]
+                                  : null,
+                            ),
+                            alignment: Alignment.center,
+                            child: const Text("📋 Paste Feed Dump", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Common Search Fields
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text("Target Role / Keyword", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 6),
+                    TextFormField(
+                      initialValue: controller.huntKeyword.value,
+                      onChanged: (val) => controller.huntKeyword.value = val,
+                      decoration: InputDecoration(
+                        hintText: "e.g. Flutter Developer, Mobile Engineer",
+                        prefixIcon: const Icon(Icons.work_outline_rounded, size: 16),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    const Text("Target Location", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 6),
+                    TextFormField(
+                      initialValue: controller.huntLocation.value,
+                      onChanged: (val) => controller.huntLocation.value = val,
+                      decoration: InputDecoration(
+                        hintText: "e.g. India, Bengaluru, Remote",
+                        prefixIcon: const Icon(Icons.location_on_outlined, size: 16),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    const Text("Target Platform", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 6),
+                    Obx(
+                      () => Row(
+                        children: ['LinkedIn', 'Naukri', 'Indeed'].map((plat) {
+                          final isSel = controller.huntPlatform.value == plat;
+                          return Padding(
+                            padding: const EdgeInsets.only(right: 8.0),
+                            child: ChoiceChip(
+                              label: Text(plat, style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: isSel ? Colors.white : null)),
+                              selected: isSel,
+                              selectedColor: const Color(0xFF6366F1),
+                              onSelected: (_) => controller.huntPlatform.value = plat,
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+
+                if (activeTab == 0) ...[
+                  // Live Hunt Info & Trigger
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: const Color(0xFF8B5CF6).withOpacity(0.3)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: const [
+                        Text(
+                          "How Live Hunt Works:",
+                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF8B5CF6)),
+                        ),
+                        SizedBox(height: 4),
+                        Text(
+                          "• Gemini Pro searches live Google Grounding for fresh LinkedIn hiring announcements.\n"
+                          "• Evaluates each recruiter's requirements against your cached resume.\n"
+                          "• Pre-calculates 0-100% Match Scores & custom pitches and saves them directly to your leads pipeline.",
+                          style: TextStyle(fontSize: 10, color: Colors.grey),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Obx(() {
+                    final isBusy = controller.isHunting.value;
+                    return ElevatedButton.icon(
+                      icon: isBusy
+                          ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                          : const Icon(Icons.bolt_rounded, size: 18),
+                      label: Text(isBusy ? "Hunting Live Posts..." : "Launch Autonomous Hunt"),
+                      onPressed: isBusy
+                          ? null
+                          : () async {
+                              await controller.runLiveJobHunt();
+                              if (context.mounted && !controller.isHunting.value) {
+                                Get.back();
+                              }
+                            },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF6366F1),
+                        foregroundColor: Colors.white,
+                        minimumSize: const Size.fromHeight(48),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      ),
+                    );
+                  }),
+                ] else ...[
+                  // Paste Feed Dump Area
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text("Paste Copied Posts / Search Text", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 6),
+                      TextField(
+                        controller: rawTextController,
+                        maxLines: 6,
+                        decoration: InputDecoration(
+                          hintText: "Copy text directly from LinkedIn search results, feed, or emails and paste here...",
+                          contentPadding: const EdgeInsets.all(12),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Obx(() {
+                        final isBusy = controller.isHunting.value;
+                        return ElevatedButton.icon(
+                          icon: isBusy
+                              ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                              : const Icon(Icons.auto_awesome_rounded, size: 18),
+                          label: Text(isBusy ? "Extracting Leads with AI..." : "Extract Leads & Compute Match Scores"),
+                          onPressed: isBusy
+                              ? null
+                              : () async {
+                                  await controller.importRawFeedDump(rawTextController.text);
+                                  if (context.mounted && !controller.isHunting.value) {
+                                    Get.back();
+                                  }
+                                },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF8B5CF6),
+                            foregroundColor: Colors.white,
+                            minimumSize: const Size.fromHeight(48),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                          ),
+                        );
+                      }),
+                    ],
+                  ),
+                ],
+                const SizedBox(height: 20),
+              ],
+            ),
+          );
+        },
+      ),
+      isScrollControlled: true,
     );
   }
 }

@@ -56,6 +56,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
         ),
         title: Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
             ClipRRect(
               borderRadius: BorderRadius.circular(6),
@@ -67,11 +68,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
             ),
             const SizedBox(width: 10),
-            Text(
-              "ApplyEngine",
-              style: appTextStyle(
-                fallback: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-                googleFontBuilder: () => GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 18),
+            Flexible(
+              child: Text(
+                "ApplyEngine",
+                style: appTextStyle(
+                  fallback: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                  googleFontBuilder: () => GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 18),
+                ),
+                overflow: TextOverflow.ellipsis,
               ),
             ),
           ],

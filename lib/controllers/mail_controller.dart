@@ -11,14 +11,35 @@ import 'package:applyengine/models/lead_model.dart';
 import 'package:applyengine/services/excel_service.dart';
 import 'package:applyengine/services/validation_service.dart';
 import 'package:applyengine/services/smtp_mailer_service.dart';
+import 'package:applyengine/services/resume_service.dart';
+import 'package:applyengine/services/gemini_service.dart';
+import 'package:applyengine/services/job_hunter_service.dart';
 
 class MailController extends GetxController with WidgetsBindingObserver {
   final ExcelService _excelService = Get.find<ExcelService>();
   final ValidationService _validationService = Get.find<ValidationService>();
   final SmtpMailerService _mailerService = Get.find<SmtpMailerService>();
+  final ResumeService _resumeService = Get.find<ResumeService>();
+  final GeminiService _geminiService = Get.find<GeminiService>();
+  final JobHunterService _jobHunterService = Get.find<JobHunterService>();
   final _storage = GetStorage();
 
   static const _whatsappChannel = MethodChannel('com.applyengine/whatsapp_automator');
+
+  // AI & Gemini Pro Settings Fields
+  final geminiApiKey = ''.obs;
+  final geminiModel = 'gemini-1.5-pro'.obs;
+  final minMatchScore = 75.obs;
+  final filterByMatchScore = false.obs;
+  final isMatchingRunning = false.obs;
+  final matchingProgress = 0.0.obs;
+  final resumeText = ''.obs;
+
+  // AI Job Hunter Fields
+  final huntKeyword = 'Flutter Developer'.obs;
+  final huntLocation = 'India / Remote'.obs;
+  final huntPlatform = 'LinkedIn'.obs;
+  final isHunting = false.obs;
 
   // Observable Settings Fields
   final senderEmail = ''.obs;
@@ -138,7 +159,19 @@ class MailController extends GetxController with WidgetsBindingObserver {
     linkedinBody.value = _storage.read('linkedinBody') ?? 'Hi {Recruiter}, I noticed your post for {Role} at {Company}. Would love to connect!';
     testMobile.value = _storage.read('testMobile') ?? '';
     testLinkedinProfile.value = _storage.read('testLinkedinProfile') ?? '';
+    geminiApiKey.value = _storage.read('geminiApiKey') ?? '';
+    geminiModel.value = _storage.read('geminiModel') ?? 'gemini-1.5-pro';
+    minMatchScore.value = _storage.read('minMatchScore') ?? 75;
+    filterByMatchScore.value = _storage.read('filterByMatchScore') ?? false;
+    huntKeyword.value = _storage.read('huntKeyword') ?? 'Flutter Developer';
+    huntLocation.value = _storage.read('huntLocation') ?? 'India / Remote';
+    huntPlatform.value = _storage.read('huntPlatform') ?? 'LinkedIn';
     _loadCampaignHistory();
+
+    // Auto extract resume if file exists
+    if (resumePath.value.isNotEmpty && File(resumePath.value).existsSync()) {
+      extractResumeText();
+    }
 
     // Auto load last Excel if file exists
     if (excelPath.value.isNotEmpty && File(excelPath.value).existsSync()) {
@@ -163,6 +196,13 @@ class MailController extends GetxController with WidgetsBindingObserver {
     ever(linkedinBody, (val) => _storage.write('linkedinBody', val));
     ever(testMobile, (val) => _storage.write('testMobile', val));
     ever(testLinkedinProfile, (val) => _storage.write('testLinkedinProfile', val));
+    ever(geminiApiKey, (val) => _storage.write('geminiApiKey', val));
+    ever(geminiModel, (val) => _storage.write('geminiModel', val));
+    ever(minMatchScore, (val) => _storage.write('minMatchScore', val));
+    ever(filterByMatchScore, (val) => _storage.write('filterByMatchScore', val));
+    ever(huntKeyword, (val) => _storage.write('huntKeyword', val));
+    ever(huntLocation, (val) => _storage.write('huntLocation', val));
+    ever(huntPlatform, (val) => _storage.write('huntPlatform', val));
   }
 
   void _subscribeToMailerEvents() {
@@ -373,6 +413,286 @@ class MailController extends GetxController with WidgetsBindingObserver {
     if (result != null && result.files.single.path != null) {
       resumePath.value = result.files.single.path!;
       addLog("Selected resume: ${p.basename(resumePath.value)}");
+      await extractResumeText();
+    }
+  }
+
+  Future<void> extractResumeText() async {
+    if (resumePath.value.isEmpty) return;
+    addLog("Extracting resume text for AI analysis...");
+    final text = await _resumeService.extractResumeText(resumePath.value);
+    resumeText.value = text;
+    if (text.isNotEmpty) {
+      addLog("Resume parsed successfully (${text.length} chars). Ready for Gemini Pro matching.");
+    } else {
+      addLog("Warning: Could not extract text from resume PDF.");
+    }
+  }
+
+  Future<void> scoreAllLeadsWithGemini() async {
+    if (geminiApiKey.value.trim().isEmpty) {
+      Get.snackbar(
+        "API Key Required",
+        "Please enter your Gemini Pro API key in the Outreach Config tab first.",
+        snackPosition: SnackPosition.BOTTOM,
+      );
+      return;
+    }
+
+    if (leads.isEmpty) {
+      Get.snackbar(
+        "No Leads Loaded",
+        "Load an Excel database or search leads first before running AI matching.",
+        snackPosition: SnackPosition.BOTTOM,
+      );
+      return;
+    }
+
+    if (resumeText.value.isEmpty) {
+      await extractResumeText();
+      if (resumeText.value.isEmpty) {
+        Get.snackbar(
+          "Resume Required",
+          "Please select a valid resume PDF file first.",
+          snackPosition: SnackPosition.BOTTOM,
+        );
+        return;
+      }
+    }
+
+    isMatchingRunning.value = true;
+    matchingProgress.value = 0.0;
+    addLog("Starting Gemini Pro reasoning & matching across ${leads.length} leads...");
+
+    int scoredCount = 0;
+    _geminiService.modelName = geminiModel.value;
+
+    try {
+      for (int i = 0; i < leads.length; i++) {
+        final lead = leads[i];
+        matchingProgress.value = (i + 1) / leads.length;
+
+        final jd = lead.emailBody.isNotEmpty
+            ? lead.emailBody
+            : "${lead.role} position at ${lead.company}. Requirements: Flutter, Dart, state management.";
+
+        addLog("AI Evaluating [${i + 1}/${leads.length}]: ${lead.recruiter} (${lead.company})...");
+
+        final result = await _geminiService.matchResumeWithJob(
+          apiKey: geminiApiKey.value.trim(),
+          resumeText: resumeText.value,
+          jobDescription: jd,
+          role: lead.role.isNotEmpty ? lead.role : "Flutter Developer",
+          company: lead.company.isNotEmpty ? lead.company : "Hiring Company",
+        );
+
+        if (result.error.isEmpty) {
+          lead.matchScore = result.matchScore;
+          lead.matchReasons = result.matchReasons;
+          lead.missingSkills = result.missingSkills;
+          if (result.customColdPitch.isNotEmpty) {
+            lead.customPitch = result.customColdPitch;
+          }
+          scoredCount++;
+          addLog("Lead #${lead.id} (${lead.company}) -> Match: ${lead.matchScore}%");
+        } else {
+          addLog("AI Score warning for #${lead.id}: ${result.error}");
+        }
+
+        leads.refresh();
+        // Friendly throttle to respect rate limits
+        await Future.delayed(const Duration(milliseconds: 300));
+      }
+
+      addLog("Gemini AI scoring complete! Scored $scoredCount leads.");
+      Get.snackbar(
+        "AI Analysis Complete",
+        "Scored $scoredCount leads with Gemini Pro reasoning.",
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Get.theme.colorScheme.primaryContainer,
+        colorText: Get.theme.colorScheme.onPrimaryContainer,
+      );
+    } catch (e) {
+      addLog("Fatal error during AI matching: $e");
+    } finally {
+      isMatchingRunning.value = false;
+      matchingProgress.value = 1.0;
+    }
+  }
+
+  Future<void> scoreSingleLead(LeadModel lead) async {
+    if (geminiApiKey.value.trim().isEmpty) {
+      Get.snackbar("API Key Required", "Configure Gemini API key first.");
+      return;
+    }
+
+    if (resumeText.value.isEmpty) {
+      await extractResumeText();
+    }
+
+    addLog("Scoring single lead: ${lead.recruiter} (${lead.company})...");
+    _geminiService.modelName = geminiModel.value;
+
+    final jd = lead.emailBody.isNotEmpty
+        ? lead.emailBody
+        : "${lead.role} at ${lead.company}";
+
+    final result = await _geminiService.matchResumeWithJob(
+      apiKey: geminiApiKey.value.trim(),
+      resumeText: resumeText.value,
+      jobDescription: jd,
+      role: lead.role,
+      company: lead.company,
+    );
+
+    if (result.error.isEmpty) {
+      lead.matchScore = result.matchScore;
+      lead.matchReasons = result.matchReasons;
+      lead.missingSkills = result.missingSkills;
+      if (result.customColdPitch.isNotEmpty) {
+        lead.customPitch = result.customColdPitch;
+      }
+      leads.refresh();
+      addLog("Scored lead: ${lead.matchScore}% match!");
+      Get.snackbar(
+        "Match: ${lead.matchScore}%",
+        lead.matchReasons.isNotEmpty ? lead.matchReasons.first : "Match computed.",
+        snackPosition: SnackPosition.BOTTOM,
+      );
+    } else {
+      Get.snackbar("AI Scoring Error", result.error);
+    }
+  }
+
+  Future<void> runLiveJobHunt() async {
+    if (geminiApiKey.value.trim().isEmpty) {
+      Get.snackbar(
+        "API Key Required",
+        "Please enter your Gemini Pro API key in the Outreach Config tab first.",
+        snackPosition: SnackPosition.BOTTOM,
+      );
+      return;
+    }
+
+    if (resumeText.value.isEmpty) {
+      await extractResumeText();
+      if (resumeText.value.isEmpty) {
+        Get.snackbar(
+          "Resume Required",
+          "Please select a valid resume PDF in Setup first so AI can match opportunities.",
+          snackPosition: SnackPosition.BOTTOM,
+        );
+        return;
+      }
+    }
+
+    isHunting.value = true;
+    addLog("Launching Autonomous AI Job Hunter for '${huntKeyword.value}' in '${huntLocation.value}' (${huntPlatform.value})...");
+
+    try {
+      final discoveredLeads = await _jobHunterService.huntLiveJobs(
+        apiKey: geminiApiKey.value.trim(),
+        resumeText: resumeText.value,
+        roleKeyword: huntKeyword.value.trim(),
+        location: huntLocation.value.trim(),
+        platform: huntPlatform.value,
+      );
+
+      if (discoveredLeads.isEmpty) {
+        addLog("AI Job Hunt: No new hiring posts found matching the query.");
+        Get.snackbar(
+          "Hunt Complete",
+          "No new posts found matching criteria. Try broadening keyword or location.",
+          snackPosition: SnackPosition.BOTTOM,
+        );
+        return;
+      }
+
+      // Deduplicate against existing leads
+      final existingEmails = leads.map((l) => l.email.toLowerCase()).where((e) => e.isNotEmpty).toSet();
+      final existingCompanies = leads.map((l) => "${l.company.toLowerCase()}_${l.recruiter.toLowerCase()}").toSet();
+
+      final List<LeadModel> freshLeads = [];
+      for (final lead in discoveredLeads) {
+        final key = "${lead.company.toLowerCase()}_${lead.recruiter.toLowerCase()}";
+        if (lead.email.isNotEmpty && existingEmails.contains(lead.email.toLowerCase())) {
+          continue;
+        }
+        if (existingCompanies.contains(key)) {
+          continue;
+        }
+        freshLeads.add(lead);
+      }
+
+      if (freshLeads.isNotEmpty) {
+        leads.insertAll(0, freshLeads);
+        _updateCounts();
+        final highMatchCount = freshLeads.where((l) => l.matchScore >= minMatchScore.value).length;
+        addLog("AI Job Hunt Success: Discovered ${freshLeads.length} leads! ($highMatchCount match >= $minMatchScore%)");
+        
+        Get.snackbar(
+          "Hunt Successful! 🎯",
+          "Found ${freshLeads.length} fresh leads! $highMatchCount match your resume >= $minMatchScore%.",
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Get.theme.colorScheme.primaryContainer,
+          colorText: Get.theme.colorScheme.onPrimaryContainer,
+          duration: const Duration(seconds: 4),
+        );
+      } else {
+        addLog("AI Job Hunt: All discovered leads were already in your database.");
+        Get.snackbar("Leads Already Exist", "Discovered leads are already saved in your pipeline.");
+      }
+    } catch (e) {
+      addLog("AI Job Hunt Exception: $e");
+      Get.snackbar("Job Hunt Error", e.toString());
+    } finally {
+      isHunting.value = false;
+    }
+  }
+
+  Future<void> importRawFeedDump(String rawText) async {
+    if (geminiApiKey.value.trim().isEmpty) {
+      Get.snackbar("API Key Required", "Configure Gemini API key first.");
+      return;
+    }
+
+    if (rawText.trim().isEmpty) {
+      Get.snackbar("Empty Feed", "Please paste the post text first.");
+      return;
+    }
+
+    if (resumeText.value.isEmpty) {
+      await extractResumeText();
+    }
+
+    isHunting.value = true;
+    addLog("Parsing unstructured feed dump with Gemini AI...");
+
+    try {
+      final parsedLeads = await _jobHunterService.parseFeedDump(
+        apiKey: geminiApiKey.value.trim(),
+        resumeText: resumeText.value,
+        rawFeedText: rawText,
+        platform: huntPlatform.value,
+      );
+
+      if (parsedLeads.isNotEmpty) {
+        leads.insertAll(0, parsedLeads);
+        _updateCounts();
+        addLog("Extracted ${parsedLeads.length} leads directly from pasted feed!");
+        Get.snackbar(
+          "Feed Extracted",
+          "Successfully extracted ${parsedLeads.length} leads into pipeline with AI scores.",
+          snackPosition: SnackPosition.BOTTOM,
+        );
+      } else {
+        Get.snackbar("No Leads Found", "Could not extract structured hiring leads from the provided text.");
+      }
+    } catch (e) {
+      addLog("Feed parsing error: $e");
+      Get.snackbar("Error", e.toString());
+    } finally {
+      isHunting.value = false;
     }
   }
 
@@ -1303,6 +1623,10 @@ class MailController extends GetxController with WidgetsBindingObserver {
       list = list.where((l) => l.status.toLowerCase() == statusFilter.value.toLowerCase()).toList();
     }
 
+    if (filterByMatchScore.value) {
+      list = list.where((l) => l.matchScore >= minMatchScore.value).toList();
+    }
+
     list.sort((a, b) {
       int cmp = 0;
       switch (sortColumn.value) {
@@ -1314,6 +1638,9 @@ class MailController extends GetxController with WidgetsBindingObserver {
           break;
         case 'Status':
           cmp = a.status.toLowerCase().compareTo(b.status.toLowerCase());
+          break;
+        case 'Match Score':
+          cmp = a.matchScore.compareTo(b.matchScore);
           break;
         default:
           cmp = a.id.compareTo(b.id);

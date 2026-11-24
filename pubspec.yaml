@@ -43,6 +43,8 @@ dependencies:
   mailer: ^6.1.0
   email_validator: ^2.1.17
   url_launcher: ^6.2.5
+  http: ^1.2.2
+  syncfusion_flutter_pdf: ^26.2.7
 
 
 

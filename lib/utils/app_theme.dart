@@ -2,11 +2,20 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+bool get isTestEnvironment {
+  if (Platform.environment.containsKey('FLUTTER_TEST')) return true;
+  try {
+    return WidgetsBinding.instance.runtimeType.toString().contains('Test');
+  } catch (_) {
+    return false;
+  }
+}
+
 TextStyle appTextStyle({
   required TextStyle fallback,
   required TextStyle Function() googleFontBuilder,
 }) {
-  if (Platform.environment.containsKey('FLUTTER_TEST')) {
+  if (isTestEnvironment) {
     return fallback;
   }
   try {
@@ -52,7 +61,7 @@ class AppTheme {
         background: backgroundLight,
         surface: surfaceLight,
       ),
-      textTheme: Platform.environment.containsKey('FLUTTER_TEST')
+      textTheme: isTestEnvironment
           ? ThemeData.light().textTheme
           : GoogleFonts.plusJakartaSansTextTheme(ThemeData.light().textTheme),
       cardTheme: CardThemeData(
@@ -117,7 +126,7 @@ class AppTheme {
         background: backgroundDark,
         surface: surfaceDark,
       ),
-      textTheme: Platform.environment.containsKey('FLUTTER_TEST')
+      textTheme: isTestEnvironment
           ? ThemeData.dark().textTheme
           : GoogleFonts.plusJakartaSansTextTheme(ThemeData.dark().textTheme),
       cardTheme: CardThemeData(

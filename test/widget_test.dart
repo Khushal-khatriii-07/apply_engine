@@ -8,12 +8,14 @@ import 'package:applyengine/main.dart';
 import 'package:applyengine/services/excel_service.dart';
 import 'package:applyengine/services/validation_service.dart';
 import 'package:applyengine/services/smtp_mailer_service.dart';
+import 'package:applyengine/services/resume_service.dart';
+import 'package:applyengine/services/gemini_service.dart';
+import 'package:applyengine/services/job_hunter_service.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   setUpAll(() {
-    // Disable network fetching of fonts in tests
     GoogleFonts.config.allowRuntimeFetching = false;
 
     // Catch and ignore all font loading failures so widget tests can run using fallback system fonts
@@ -46,6 +48,9 @@ void main() {
     Get.put(ExcelService());
     Get.put(ValidationService());
     Get.put(SmtpMailerService());
+    Get.put(ResumeService());
+    Get.put(GeminiService());
+    Get.put(JobHunterService());
   });
 
   tearDown(() {

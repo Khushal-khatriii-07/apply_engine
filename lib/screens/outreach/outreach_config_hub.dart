@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:applyengine/controllers/mail_controller.dart';
+import 'package:applyengine/services/gemini_service.dart';
 import 'package:applyengine/utils/app_theme.dart';
 
 class OutreachConfigHub extends StatefulWidget {
@@ -56,6 +57,7 @@ class _OutreachConfigHubState extends State<OutreachConfigHub> {
                 _buildSegmentButton("Email", activePlatform == "Email", isDark, theme),
                 _buildSegmentButton("WhatsApp", activePlatform == "WhatsApp", isDark, theme),
                 _buildSegmentButton("LinkedIn", activePlatform == "LinkedIn", isDark, theme),
+                _buildSegmentButton("Gemini AI", activePlatform == "Gemini", isDark, theme),
               ],
             ),
           ),
@@ -76,7 +78,9 @@ class _OutreachConfigHubState extends State<OutreachConfigHub> {
                   ? _buildEmailConfigForm(theme, isDark)
                   : activePlatform == "WhatsApp"
                       ? _buildWhatsappConfigForm(theme, isDark)
-                      : _buildLinkedinConfigForm(theme, isDark),
+                      : activePlatform == "LinkedIn"
+                          ? _buildLinkedinConfigForm(theme, isDark)
+                          : _buildGeminiConfigForm(theme, isDark),
             ),
           ),
         ],
@@ -119,7 +123,9 @@ class _OutreachConfigHubState extends State<OutreachConfigHub> {
                     ? Icons.mail_outline_rounded
                     : platform == "WhatsApp"
                         ? Icons.phone_iphone_rounded
-                        : Icons.link_rounded,
+                        : platform == "LinkedIn"
+                            ? Icons.link_rounded
+                            : Icons.auto_awesome_rounded,
                 size: 16,
                 color: isActive
                     ? (isDark ? Colors.white : theme.colorScheme.primary)
@@ -1060,6 +1066,385 @@ class _OutreachConfigHubState extends State<OutreachConfigHub> {
                   ),
                 ),
               ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 24),
+      ],
+    );
+  }
+
+  // --- GEMINI PRO AI CONFIG FORM ---
+  Widget _buildGeminiConfigForm(ThemeData theme, bool isDark) {
+    final borderSide = BorderSide(
+      color: isDark ? const Color(0xFF475569) : const Color(0xFFCBD5E1),
+      width: 1.5,
+    );
+
+    return ListView(
+      key: const ValueKey("gemini_form"),
+      padding: const EdgeInsets.only(left: 12.0, right: 12.0, top: 0, bottom: 100.0),
+      children: [
+        // Premium Setup Header Card
+        Container(
+          padding: const EdgeInsets.all(16),
+          margin: const EdgeInsets.only(bottom: 16),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: isDark
+                  ? [const Color(0xFF2E1065), const Color(0xFF1E1B4B)]
+                  : [const Color(0xFFF3E8FF), const Color(0xFFEDE9FE)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: isDark ? const Color(0xFF7C3AED).withOpacity(0.4) : const Color(0xFFC4B5FD),
+              width: 1.5,
+            ),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          "Gemini Pro Intelligence Engine",
+                          style: GoogleFonts.outfit(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 15,
+                            color: isDark ? Colors.white : const Color(0xFF4C1D95),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Colors.purple.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: const Text(
+                            "PRO REASONING",
+                            style: TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: Colors.purpleAccent),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      "Analyzes full Job Descriptions against your Resume, computes 0-100% Match Scores, and crafts tailored cold pitches.",
+                      style: TextStyle(fontSize: 11, color: isDark ? Colors.white70 : Colors.black87),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 16),
+              CircleAvatar(
+                radius: 20,
+                backgroundColor: const Color(0xFF8B5CF6).withOpacity(0.2),
+                child: const Icon(Icons.auto_awesome_rounded, color: Color(0xFF8B5CF6), size: 20),
+              ),
+            ],
+          ),
+        ),
+
+        // API Key & Model Configuration Card
+        Card(
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+            side: borderSide,
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(18.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildCardHeader(theme, "Gemini API Credentials", Icons.key_rounded),
+                const SizedBox(height: 18),
+                Obx(
+                  () => Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        "Google AI Studio API Key",
+                        style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 8),
+                      TextFormField(
+                        initialValue: controller.geminiApiKey.value,
+                        obscureText: _obscurePassword,
+                        onChanged: (val) => controller.geminiApiKey.value = val.trim(),
+                        decoration: InputDecoration(
+                          hintText: "AIzaSy...",
+                          prefixIcon: const Icon(Icons.vpn_key_rounded, size: 18),
+                          suffixIcon: IconButton(
+                            icon: Icon(_obscurePassword ? Icons.visibility_off_rounded : Icons.visibility_rounded, size: 18),
+                            onPressed: () {
+                              setState(() {
+                                _obscurePassword = !_obscurePassword;
+                              });
+                            },
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            borderSide: borderSide,
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            borderSide: borderSide,
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            borderSide: BorderSide(color: theme.colorScheme.primary, width: 2),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                // Model Selector
+                Obx(
+                  () => Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        "AI Reasoning Model",
+                        style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: borderSide.color, width: 1.5),
+                        ),
+                        child: DropdownButtonHideUnderline(
+                          child: DropdownButton<String>(
+                            value: controller.geminiModel.value,
+                            isExpanded: true,
+                            items: const [
+                              DropdownMenuItem(
+                                value: 'gemini-1.5-pro',
+                                child: Text('Gemini 1.5 Pro (Deep Reasoning & Match Scoring)'),
+                              ),
+                              DropdownMenuItem(
+                                value: 'gemini-2.0-flash',
+                                child: Text('Gemini 2.0 Flash (Ultra Fast Processing)'),
+                              ),
+                              DropdownMenuItem(
+                                value: 'gemini-1.5-flash',
+                                child: Text('Gemini 1.5 Flash (Lightweight & Quick)'),
+                              ),
+                            ],
+                            onChanged: (val) {
+                              if (val != null) {
+                                controller.geminiModel.value = val;
+                              }
+                            },
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                // Verify API Key Button
+                OutlinedButton.icon(
+                  icon: const Icon(Icons.check_circle_outline_rounded, size: 16),
+                  label: const Text("Verify Gemini API Key", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                  onPressed: () async {
+                    if (controller.geminiApiKey.value.isEmpty) {
+                      Get.snackbar("Missing Key", "Please paste your Gemini API key first.");
+                      return;
+                    }
+                    Get.dialog(
+                      const Center(child: CircularProgressIndicator()),
+                      barrierDismissible: false,
+                    );
+                    final isValid = await Get.find<GeminiService>().validateApiKey(controller.geminiApiKey.value);
+                    Get.back();
+                    if (isValid) {
+                      Get.defaultDialog(
+                        title: "Gemini Connection Verified",
+                        middleText: "Successfully authenticated with Google Gemini (${controller.geminiModel.value}).",
+                        textConfirm: "OK",
+                        confirmTextColor: Colors.white,
+                        onConfirm: () => Get.back(),
+                      );
+                    } else {
+                      Get.defaultDialog(
+                        title: "Connection Failed",
+                        middleText: "Could not connect with the provided API key. Please verify it in Google AI Studio.",
+                        textConfirm: "OK",
+                        confirmTextColor: Colors.white,
+                        onConfirm: () => Get.back(),
+                      );
+                    }
+                  },
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size.fromHeight(44),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        // Resume Status & Cache Card
+        Card(
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+            side: borderSide,
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(18.0),
+            child: Obx(() {
+              final hasResume = controller.resumePath.value.isNotEmpty;
+              final resumeLen = controller.resumeText.value.length;
+
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildCardHeader(theme, "Resume Profile Status", Icons.description_rounded),
+                  const SizedBox(height: 14),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: hasResume
+                          ? (isDark ? const Color(0xFF064E3B) : const Color(0xFFECFDF5))
+                          : (isDark ? const Color(0xFF7F1D1D) : const Color(0xFFFEF2F2)),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: hasResume ? Colors.green.withOpacity(0.3) : Colors.red.withOpacity(0.3),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          hasResume ? Icons.task_alt_rounded : Icons.error_outline_rounded,
+                          color: hasResume ? Colors.green : Colors.redAccent,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                hasResume ? "Resume Loaded" : "No Resume Configured",
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                hasResume
+                                    ? "$resumeLen characters extracted and ready for scoring"
+                                    : "Select a PDF resume to enable AI matching",
+                                style: const TextStyle(fontSize: 11, color: Colors.grey),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          icon: const Icon(Icons.file_upload_outlined, size: 16),
+                          label: Text(hasResume ? "Change PDF" : "Pick Resume PDF", style: const TextStyle(fontSize: 11)),
+                          onPressed: () => controller.selectResume(),
+                          style: OutlinedButton.styleFrom(
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                        ),
+                      ),
+                      if (hasResume) ...[
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            icon: const Icon(Icons.refresh_rounded, size: 16),
+                            label: const Text("Re-Parse Text", style: TextStyle(fontSize: 11)),
+                            onPressed: () => controller.extractResumeText(),
+                            style: OutlinedButton.styleFrom(
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ],
+              );
+            }),
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        // AI Match Filtering Criteria Card
+        Card(
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+            side: borderSide,
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(18.0),
+            child: Obx(
+              () => Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildCardHeader(theme, "Match Score Threshold", Icons.tune_rounded),
+                  const SizedBox(height: 14),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        "Filter leads by minimum score:",
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.primary.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          "${controller.minMatchScore.value}% or Higher",
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                            color: theme.colorScheme.primary,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  Slider(
+                    value: controller.minMatchScore.value.toDouble(),
+                    min: 50.0,
+                    max: 95.0,
+                    divisions: 9,
+                    activeColor: theme.colorScheme.primary,
+                    label: "${controller.minMatchScore.value}%",
+                    onChanged: (val) => controller.minMatchScore.value = val.round(),
+                  ),
+                  const Text(
+                    "Only jobs where the candidate's skills, years of experience, and project profile match at or above this threshold will appear in your prioritized outreach queue.",
+                    style: TextStyle(fontSize: 11, color: Colors.grey),
+                  ),
+                ],
+              ),
             ),
           ),
         ),

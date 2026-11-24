@@ -124,7 +124,76 @@ class HomeTab extends StatelessWidget {
           ),
           const SizedBox(height: 16),
 
-          // 2. CAMPAIGN METRICS GRID
+          // 2. AI HUNT QUICK TRIGGER HERO BANNER
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
+                begin: Alignment.centerLeft,
+                end: Alignment.centerRight,
+              ),
+              borderRadius: BorderRadius.circular(18),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF8B5CF6).withOpacity(0.25),
+                  blurRadius: 8,
+                  offset: const Offset(0, 3),
+                )
+              ],
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.bolt_rounded, color: Colors.white, size: 22),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        "Autonomous AI Job Hunter",
+                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                      ),
+                      const SizedBox(height: 2),
+                      Obx(() => Text(
+                        controller.isHunting.value
+                            ? "Hunting live posts..."
+                            : "Target: ${controller.huntKeyword.value} (${controller.huntPlatform.value})",
+                        style: const TextStyle(color: Colors.white70, fontSize: 11),
+                      )),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Obx(() {
+                  final isHunting = controller.isHunting.value;
+                  return ElevatedButton(
+                    onPressed: isHunting ? null : () => controller.runLiveJobHunt(),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.white,
+                      foregroundColor: const Color(0xFF6366F1),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      elevation: 0,
+                    ),
+                    child: isHunting
+                        ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                        : const Text("Hunt Now", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
+                  );
+                }),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // 3. CAMPAIGN METRICS GRID
           Row(
             children: [
               Expanded(
